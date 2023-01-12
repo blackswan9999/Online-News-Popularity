@@ -1,0 +1,662 @@
+---
+title: "Online News Popularity"
+author: "Alice Huang"
+date: "02/11/2022"
+output:
+  html_document:
+    df_print: paged
+---
+
+# Assignment 7 Part 1a
+
+```{r include=FALSE}
+library(tidyverse)
+```
+
+
+```{r}
+data_news <- read.csv("https://raw.githubusercontent.com/blackswan9999/Online-News-Popularity/main/OnlineNewsPopularity.csv")
+```
+
+# Assignment 7 1b and 1c
+
+```{r}
+head(data_news)
+summary(data_news)
+```
+
+Here are the potential response variables:
+
+### 1. ntokenstitle: the number of words in the news article's title (Integer)
+
+I looked at the summary of the data and checked for any observations where the number of tokens was 0 or negative. I did not find any such observations.
+
+```{r}
+plot(data_news$n_tokens_title, data_news$shares, xlab = "Number of Token Words in Title", ylab = "Number of Times Article was Shared")
+```
+
+### 2. ntokenscontent: the number of words in the entire news article (Integer)
+
+I looked at the summary of the data and checked for any observations where the number of words in the entire news article was 0 or negative. Unfortunately, there were 1181 observations where the number of words in the entire news article was entered as 0. I looked at the url of the corresponding article to see if there were indeed 0 words in that article. For example, the article with url https://mashable.com/archive/online-video-consumption was listed as having 0 words in the entire article, but if I actually click on the link, I can see that there are actually more than 0 words. So I think that this was a data entry error. In my analysis, I will filter out the observations that are listed as having 0 words in the entire news article.
+
+```{r}
+data_news %>% filter(n_tokens_content <= 0) %>% summarize(articles_with_invalid_word_count = n())
+```
+
+```{r}
+plot(data_news$n_tokens_content, data_news$shares, xlab = "Number of Words in Article", ylab = "Number of Times Article was Shared")
+```
+
+We can see that there are a lot of articles that were entered as having 0 words.
+
+### 3. n_unique_tokens: Rate of unique words in the news article (Float)
+
+I am expecting the rate of unique words in the news article to be a float between 0 and 1. As we can see in the graph, there is one observation where the rate is entered as 701. That is probably a data entry error and I would omit that observation in my analyses.
+
+```{r}
+plot(data_news$n_unique_tokens, data_news$shares, xlab = "Unique Words in Article", ylab = "Number of Times Article was Shared")
+```
+
+### 4. n_non_stop_words: Rate of non-stop words in the news article (Float)
+
+I am expecting the rate of non-stop words in the news article to be a float between 0 and 1. As we can see in the graph, there is one observation where the rate is entered as 1042. That is probably a data entry error and I would omit that observation in my analyses.
+
+```{r}
+plot(data_news$n_non_stop_words, data_news$shares, xlab = "Number of Non-stop Words in Article", ylab = "Number of Times Article was Shared")
+```
+
+### 5. nnonstopuniquetokens: Rate of unique non-stop words in the content(Integer)
+
+I am expecting the rate of unique non-stop words in the news article to be a float between 0 and 1. As we can see in the graph, there is one observation where the rate is entered as 650. That is probably a data entry error and I would omit that observation in my analyses.
+
+```{r}
+plot(data_news$n_non_stop_unique_tokens, data_news$shares, xlab = "Number of Unique Non-stop Words in Article", ylab = "Number of Times Article was Shared")
+```
+
+### 6. num_hrefs: Number of links (Integer)
+
+I am expecting the number of links to be a non-negative integer value. I did not find any observations with invalid number of links.
+
+```{r}
+plot(data_news$num_hrefs, data_news$shares, xlab = "Number of Links in Article", ylab = "Number of Times Article was Shared")
+
+filter(data_news, data_news$num_hrefs != floor(data_news$num_hrefs)) 
+```
+
+### 7. num_self_hrefs: Number of links to other articles published by Mashable (Integer)
+
+```{r}
+plot(data_news$num_self_hrefs, data_news$shares, xlab = "Number of Mashable Links in Article", ylab = "Number of Times Article was Shared")
+
+filter(data_news, data_news$num_self_hrefs != floor(data_news$num_self_hrefs))
+```
+
+
+### 8. num_imgs: Number of images in the article(float)
+
+I am expecting non-negative integer values for the number of images. I did not find any observations with invalid values for the number of images.
+
+```{r}
+plot(data_news$num_imgs, data_news$shares, xlab = "Number of Images in Article", ylab = "Number of Times Article was Shared")
+
+filter(data_news, data_news$num_imgs != floor(data_news$num_imgs))
+```
+
+### 9. num_videos: Number of videos in the article (float)
+
+I am expecting non-negative integer values for the number of videos. I did not find any observations where there were values for the number of images that were not non-negative.
+
+```{r}
+plot(data_news$num_videos, data_news$shares, xlab = "Number of Videos in Article", ylab = "Number of Times Article was Shared")
+
+filter(data_news, data_news$num_videos != floor(data_news$num_videos))
+```
+
+
+### 10. averagetokenlength: Average length of the words in the article (float)
+
+I am expecting the average length of words to be strictly greater than 1, since a word must have at least 1 letter. I found 1181 observations where there were invalid values. I visited the links of some of those articles and I saw that the average length of the words in the article should not have been entered as a value less than 1. I will filter out these observations while analyzing my data.
+
+```{r}
+plot(data_news$average_token_length, data_news$shares, xlab = "Average Word Length in Article", ylab = "Number of Times Article was Shared")
+
+filter(data_news, data_news$average_token_length < 1) %>% select(url, average_token_length)
+```
+
+
+
+### 11. num_keywords: Number of keywords in the metadata (Integer)
+
+I am expecting non-negative integer values for the number of keywords in the metadata. I did not find any observations where there were values for the number of images that were not non-negative.
+
+```{r}
+plot(data_news$num_keywords, data_news$shares, xlab = "Number of Keywords in Metadata", ylab = "Number of Times Article was Shared")
+
+filter(data_news, data_news$num_keywords != floor(data_news$num_keywords))
+```
+
+
+### 12. data_channel_is_lifestyle: Was the article was posted in the data channel called 'Lifestyle'? (Binary)
+
+The data for this variable were entered as 0's and 1's, and the variable is supposed to be binary, so there shouldn't be any values besides 0 and 1. I did not notice any observations where the data_channel_is_lifestyle variable was entered as something besides 0 and 1. 
+
+```{r}
+plot(data_news$data_channel_is_lifestyle, data_news$shares, xlab = "If Article was in LifeStyle Data Channel", ylab = "Number of Times Article was Shared")
+
+filter(data_news, !data_news$data_channel_is_lifestyle %in% c(0,1) )
+```
+
+
+### 13. data_channel_is_entertainment: Was the article was posted in the data channel called 'Entertainment'? (Binary)
+
+The observations for this variable were entered as 0's and 1's, and the variable is supposed to be binary, so there shouldn't be any values besides 0 and 1. I did not notice any observations where the variable was entered as something besides 0 and 1. 
+
+```{r}
+plot(data_news$data_channel_is_entertainment, data_news$shares, xlab = "If Article was in Entertainment Data Channel", ylab = "Number of Times Article was Shared")
+
+filter(data_news, !data_news$data_channel_is_entertainment %in% c(0,1) )
+```
+
+
+### 14. data_channel_is_bus: Was the article was posted in the data channel called 'Business'? (Binary)
+
+The data for this variable was entered as 0's and 1's, and the variables is supposed to be binary, so there shouldn't be any values besides 0 and 1. I did not notice any observations where this variable was entered as something besides 0 and 1. 
+
+```{r}
+plot(data_news$data_channel_is_bus, data_news$shares, xlab = "If Article was in Business Data Channel", ylab = "Number of Times Article was Shared")
+
+filter(data_news, !data_news$data_channel_is_bus %in% c(0,1) )
+```
+
+
+### 15. datachannelis_socmed: Was the article was posted in the data channel called 'Social Media'? (Binary)
+
+The data for this variable was entered as 0's and 1's, and the variable is supposed to be binary, so there shouldn't be any values besides 0 and 1. I did not notice any observations where the variable was entered as something besides 0 and 1. 
+
+```{r}
+plot(data_news$data_channel_is_socmed, data_news$shares, xlab = "If Article was in Social Media Channel", ylab = "Number of Times Article was Shared")
+
+filter(data_news, !data_news$data_channel_is_socmed %in% c(0,1) )
+```
+
+
+
+### 16. datachannelis_tech: Was the article was posted in the data channel called 'Tech'? (Binary)
+
+The data for this variable was entered as 0's and 1's, and the variable is supposed to be binary, so there shouldn't be any values besides 0 and 1. I did not notice any observations where this variable was entered as something besides 0 and 1. 
+
+```{r}
+plot(data_news$data_channel_is_tech, data_news$shares, xlab = "If Article was in Tech Data Channel", ylab = "Number of Times Article was Shared")
+
+filter(data_news, !data_news$data_channel_is_tech %in% c(0,1) )
+```
+
+
+### 17. data_channel_is_world: Was the article was posted in the data channel called 'World'? (Binary)
+
+The data for this variable was entered as 0's and 1's, and the variable is supposed to be binary, so there shouldn't be any values besides 0 and 1. I did not notice any observations where this binary variable was entered as something besides 0 and 1. 
+
+```{r}
+plot(data_news$data_channel_is_world, data_news$shares, xlab = "If Article was in World Data Channel", ylab = "Number of Times Article was Shared")
+
+filter(data_news, !data_news$data_channel_is_world %in% c(0,1) )
+```
+
+
+For variables 18-26, the researchers ranked the keywords in the article by the number of times articles with those keywords got shared on average (known before publication). Then they were able to find the worst keyword, average keyword, and best keyword. For each keyword, they listed the minimum number of times articles with that keyword were shared, the maximum number of times articles with that keyword were shared, and the average number of times articles with that keyword were shared. 
+
+### 18. kw_min_min: Worst keyword (min. shares) (float)
+
+I am expecting non-negative integer values for this variable. I found 22980 observations where there were invalid values. Many of them seemed to have the minimum number of times articles with the worst keyword were shared being entered as -1. I will filter out these observations while analyzing my data.
+
+```{r}
+plot(data_news$kw_min_min, data_news$shares, xlab = "Minimum number of times Articles with Worst Keyword were Shared", ylab = "Number of Times Article was Shared")
+
+filter(data_news, (data_news$kw_min_min < 0) | 
+         (data_news$kw_min_min != floor(data_news$kw_min_min)) ) %>% select(url, kw_min_min)
+```
+
+
+### 19. kw_max_min: Worst keyword (max. shares) (float)
+
+I am expecting non-negative integer values for this variable. I found 111 observations where there were invalid values. Many of them seemed to have the maximum number of times articles with the worst keyword were shared being entered as 1.59. I will filter out these observations while analyzing my data.
+
+```{r}
+plot(data_news$kw_max_min, data_news$shares, xlab = "Maximum number of times Articles with Worst Keyword were Shared", ylab = "Number of Times Article was Shared")
+
+filter(data_news, (data_news$kw_max_min < 0) | 
+         (data_news$kw_max_min != floor(data_news$kw_max_min)) ) %>% select(url, kw_max_min)
+```
+
+### 20. kw_avg_min: Worst keyword (avg. shares) (float)
+
+I am expecting the average number of times articles with the worst keyword were shared to be a float strictly greater than 0. I found 833 observations where there were invalid values. I will filter out these observations while analyzing my data.
+
+```{r}
+plot(data_news$kw_avg_min, data_news$shares, xlab = "Average number of times Articles with Worst Keyword were Shared", ylab = "Number of Times Article was Shared")
+
+filter(data_news, data_news$kw_avg_min < 0) %>% select(url, kw_avg_min)
+```
+
+
+### 21. kwminmax: Best keyword (min. shares) (float)
+
+I am expecting non-negative integer values for this variable. I found no observations where there were invalid values.
+
+```{r}
+plot(data_news$kw_min_max, data_news$shares, xlab = "Minimum number of times Articles with Best Keyword were Shared", ylab = "Number of Times Article was Shared")
+
+filter(data_news, (data_news$kw_min_max < 0) | 
+         (data_news$kw_min_max != floor(data_news$kw_min_max)) ) %>% select(url, kw_min_max)
+```
+
+
+### 22. kw_max_max: Best keyword (max. shares) (float)
+
+I am expecting non-negative integer values for this variable. I found no observations where there were invalid values.
+
+```{r}
+plot(data_news$kw_max_max, data_news$shares, xlab = "Maximum number of times Articles with Best Keyword were Shared", ylab = "Number of Times Article was Shared")
+
+filter(data_news, (data_news$kw_max_max < 0) | 
+         (data_news$kw_max_max != floor(data_news$kw_max_max)) ) %>% select(url, kw_max_max)
+```
+
+### 23. kwavgmax: Best keyword (avg. shares) (float)
+
+I am expecting the average number of times articles with the best keyword were shared to be a float strictly greater than 0. I found no observations where there were invalid values.
+
+```{r}
+plot(data_news$kw_avg_max, data_news$shares, xlab = "Average number of times Articles with Best Keyword were Shared", ylab = "Number of Times Article was Shared")
+
+filter(data_news, data_news$kw_avg_max < 0) %>% select(url, kw_avg_max)
+```
+
+
+### 24. kwminavg: Avg. keyword (min. shares) (float)
+
+I am expecting non-negative integer values for this variable. I found 18689 observations where there were invalid values. Many of them seemed to have the minimum number of times articles with the average keyword were shared being entered as non-integer values. I will filter out these observations while analyzing my data.
+
+```{r}
+plot(data_news$kw_min_avg, data_news$shares, xlab = "Minimum number of times Articles with Average Keyword were Shared", ylab = "Number of Times Article was Shared")
+
+filter(data_news, (data_news$kw_min_avg < 0) | 
+         (data_news$kw_min_avg != floor(data_news$kw_min_avg)) ) %>% select(url, kw_min_avg)
+```
+
+
+### 25. kw_max_avg: Avg. keyword (max. shares) (float)
+
+I am expecting non-negative integer values for this variable. I found 36495 observations where there were invalid values. Many of them seemed to have the maximum number of times articles with the average keyword were shared being entered as non-integer values. I'd have to see how big the dataset is after I filter out other invalid values, but either I will filter out these observations while analyzing my data, or I might have to disregard this variable entirely.
+
+```{r}
+plot(data_news$kw_max_avg, data_news$shares, xlab = "Maximum number of times Articles with Average Keyword were Shared", ylab = "Number of Times Article was Shared")
+
+filter(data_news, (data_news$kw_max_avg < 0) | 
+         (data_news$kw_max_avg != floor(data_news$kw_max_avg)) ) %>% select(url, kw_max_avg)
+```
+
+### 26. kwavgavg: Avg. keyword (avg. shares) (float)
+
+I am expecting the average number of times articles with the average keyword were shared to be a float strictly greater than 0. I found no observations where there were invalid values. 
+
+```{r}
+plot(data_news$kw_avg_avg, data_news$shares, xlab = "Average number of times Articles with Average Keyword were Shared", ylab = "Number of Times Article was Shared")
+
+filter(data_news, data_news$kw_avg_avg < 0) %>% select(url, kw_avg_avg)
+```
+
+
+
+The researchers looked at which other Mashable articles were cited in an article, and how many times those referenced articles were shared.
+
+### 27. selfreferencemin_shares: Minimum number of times a referenced Mashable article in that article was shared (float)
+
+I am expecting non-negative integer values for the minimum number of times a referenced article was shared. I found 10 observations where there were invalid values. Many of them seemed to be entered as non-integer values. I will filter out these observations while analyzing my data.
+
+```{r}
+plot(data_news$self_reference_min_shares, data_news$shares, xlab = "Minimum number of times a referenced article was shared", ylab = "Number of Times Article was Shared")
+
+filter(data_news, data_news$self_reference_min_shares != floor(data_news$self_reference_min_shares)) %>% select(url, self_reference_min_shares)
+```
+
+### 28. selfreferencemax_shares: Maximum number of times a referenced Mashable article in that article was shared (float)
+
+I am expecting non-negative integer values for the maximum number of times a referenced article was shared. I found 3 observations where there were invalid values. Many of them seemed to be entered as non-integer values. I will filter out these observations while analyzing my data.
+
+```{r}
+plot(data_news$self_reference_max_shares, data_news$shares, xlab = "Maximum number of times a referenced article was shared", ylab = "Number of Times Article was Shared")
+
+filter(data_news, data_news$self_reference_max_shares != floor(data_news$self_reference_max_shares)) %>% select(url, self_reference_max_shares)
+```
+
+
+### 29. selfreferenceavg_sharess: Average number of times referenced Mashable articles in that article were shared (float)
+
+I am expecting non-negative float values for the average number of times a referenced article was shared. I did not find observations where there were invalid values for this variable.
+
+```{r}
+plot(data_news$self_reference_min_shares, data_news$shares, xlab = "Minimum number of times a referenced article was shared", ylab = "Number of Times Article was Shared")
+
+filter(data_news, data_news$self_reference_avg_sharess < 0) %>% select(url, self_reference_min_shares)
+```
+
+
+The researchers examined if the day on which the article was published was relevant to how many times it was shared.
+
+### 30. weekdayismonday: Was the article published on a Monday? (Binary)
+
+This variable should take on 0, or 1. There don't seem to be any observations with invalid values for this variable.
+
+```{r}
+plot(data_news$weekday_is_monday, data_news$shares, xlab = "If Article was Published on Monday", ylab = "Number of Times Article was Shared")
+
+filter(data_news, !data_news$weekday_is_monday %in% c(0,1) )
+```
+
+
+### 31. weekdayistuesday: Was the article published on a Tuesday? (Binary)
+
+This variable should take on 0, or 1. There don't seem to be any observations with invalid values for this variable.
+
+```{r}
+plot(data_news$weekday_is_tuesday, data_news$shares, xlab = "If Article was Published on Tuesday", ylab = "Number of Times Article was Shared")
+
+filter(data_news, !data_news$weekday_is_tuesday %in% c(0,1) )
+```
+
+### 32. weekdayiswednesday: Was the article published on a Wednesday? (Binary)
+
+This variable should take on 0, or 1. There don't seem to be any observations with invalid values for this variable.
+
+```{r}
+plot(data_news$weekday_is_wednesday, data_news$shares, xlab = "If Article was Published on Wednesday", ylab = "Number of Times Article was Shared")
+
+filter(data_news, !data_news$weekday_is_wednesday %in% c(0,1) )
+```
+
+
+### 33. weekdayisthursday: Was the article published on a Thursday? (Binary)
+
+This variable should take on 0, or 1. There don't seem to be any observations with invalid values for this variable.
+
+```{r}
+plot(data_news$weekday_is_thursday, data_news$shares, xlab = "If Article was Published on Thursday", ylab = "Number of Times Article was Shared")
+
+filter(data_news, !data_news$weekday_is_thursday %in% c(0,1) )
+```
+
+
+### 34. weekdayisfriday: Was the article published on a Friday? (Binary)
+
+This variable should take on 0, or 1. There don't seem to be any observations with invalid values for this variable.
+
+```{r}
+plot(data_news$weekday_is_friday, data_news$shares, xlab = "If Article was Published on Friday", ylab = "Number of Times Article was Shared")
+
+filter(data_news, !data_news$weekday_is_friday %in% c(0,1) )
+```
+
+
+### 35. weekdayissaturday: Was the article published on a Saturday? (Binary)
+
+This variable should take on 0, or 1. There don't seem to be any observations with invalid values for this variable.
+
+```{r}
+plot(data_news$weekday_is_saturday, data_news$shares, xlab = "If Article was Published on Saturday", ylab = "Number of Times Article was Shared")
+
+filter(data_news, !data_news$weekday_is_saturday %in% c(0,1) )
+```
+
+
+### 36. weekdayissunday: Was the article published on a Sunday? (Binary)
+
+This variable should take on 0, or 1. There don't seem to be any observations with invalid values for this variable.
+
+```{r}
+plot(data_news$weekday_is_sunday, data_news$shares, xlab = "If Article was Published on Sunday", ylab = "Number of Times Article was Shared")
+
+filter(data_news, !data_news$weekday_is_sunday %in% c(0,1) )
+```
+
+
+### 37. is_weekend: Was the article published on the weekend? (Binary)
+
+This variable should take on 0, or 1. There don't seem to be any observations with invalid values for this variable.
+
+```{r}
+plot(data_news$is_weekend, data_news$shares, xlab = "If Article was Published on Weekend", ylab = "Number of Times Article was Shared")
+
+filter(data_news, !data_news$is_weekend %in% c(0,1) )
+```
+
+
+The researchers applied the Latent Dirichlet Allocation (LDA) algorithm to all Mashable articles, which finds which topics the articles belong to, and found the top 5 most relevant topics. Variables 38-42 measure how close an article is to one of the top 5 most relevant topics. 
+
+### 38. LDA_00: Closeness to LDA topic 0 (float)
+
+I am expecting the values for this variable to be a float between 0 and 1. There are no observations with invalid values for this variable.
+
+```{r}
+plot(data_news$LDA_00, data_news$shares, xlab = "Closeness to LDA topic 0", ylab = "Number of Times Article was Shared")
+
+filter(data_news, LDA_00 < 0 | LDA_00 > 1)
+```
+
+
+### 39. LDA_01: Closeness to LDA topic 1 (float)
+
+I am expecting the values for this variable to be a float between 0 and 1. There are no observations with invalid values for this variable.
+
+```{r}
+plot(data_news$LDA_01, data_news$shares, xlab = "Closeness to LDA topic 1", ylab = "Number of Times Article was Shared")
+
+filter(data_news, LDA_01 < 0 | LDA_01 > 1)
+```
+
+
+### 40. LDA_02: Closeness to LDA topic 2 (float)
+
+I am expecting the values for this variable to be a float between 0 and 1. There are no observations with invalid values for this variable.
+
+```{r}
+plot(data_news$LDA_02, data_news$shares, xlab = "Closeness to LDA topic 2", ylab = "Number of Times Article was Shared")
+
+filter(data_news, LDA_02 < 0 | LDA_02 > 1)
+```
+
+
+### 41. LDA_03: Closeness to LDA topic 3 (float)
+
+I am expecting the values for this variable to be a float between 0 and 1. There are no observations with invalid values for this variable.
+
+```{r}
+plot(data_news$LDA_03, data_news$shares, xlab = "Closeness to LDA topic 3", ylab = "Number of Times Article was Shared")
+
+filter(data_news, LDA_03 < 0 | LDA_03 > 1)
+```
+
+
+### 42. LDA_04: Closeness to LDA topic 4 (float)
+
+I am expecting the values for this variable to be a float between 0 and 1. There are no observations with invalid values for this variable.
+
+```{r}
+plot(data_news$LDA_04, data_news$shares, xlab = "Closeness to LDA topic 4", ylab = "Number of Times Article was Shared")
+
+filter(data_news, LDA_04 < 0 | LDA_04 > 1)
+```
+
+
+Polarity is a measure of how negative or positive the emotions conveyed in a text are. Subjectivity is a measure of how much a text reflects personal opinion/feelings/beliefs in contrast to objectivity, which measures how factual a text is. To compute the subjectivity and polarity sentiment analysis, the researchers adopted the Pattern web mining module (http://www.clips.ua.ac.be/pattern). Here positive words refer to words that evoke positive emotions in the reader, whereas negative words refer to words that evoke negative emotions in the reader. 
+
+### 43. global_subjectivity: Text subjectivity (float)
+
+I am expecting the values for this variable to be a float between 0 and 1. There are no observations with invalid values for this variable.
+
+```{r}
+plot(data_news$global_subjectivity, data_news$shares, xlab = "Text Subjectivity", ylab = "Number of Times Article was Shared")
+
+range(data_news$global_subjectivity)
+```
+
+
+### 44. globalsentimentpolarity: Text sentiment polarity (float)
+
+I am expecting the values for this variable to be a float between -1 and 1. There are no observations with invalid values for this variable.
+
+```{r}
+plot(data_news$global_sentiment_polarity, data_news$shares, xlab = "Text Sentiment Polarity", ylab = "Number of Times Article was Shared")
+
+range(data_news$global_sentiment_polarity)
+```
+
+
+### 45. globalratepositive_words: Rate of positive words in the content (float)
+
+I am expecting the values of this variable to be a float between 0 and 1. There are no observations with invalid values for this variable
+
+```{r}
+plot(data_news$global_rate_positive_words, data_news$shares, xlab = "Rate of Positive Words in Article", ylab = "Number of Times Article was Shared")
+
+range(data_news$global_rate_positive_words)
+```
+
+### 46. globalratenegative_words: Rate of negative words in the content (float)
+
+I am expecting the values of this variable to be a float between 0 and 1. There are no observations with invalid values for this variable
+
+```{r}
+plot(data_news$global_rate_negative_words, data_news$shares, xlab = "Rate of Negative Words in Article", ylab = "Number of Times Article was Shared")
+
+range(data_news$global_rate_negative_words)
+```
+
+### 47. ratepositivewords: Rate of positive words among non-neutral tokens (float)
+
+I am expecting the values of this variable to be a float between 0 and 1. There are no observations with invalid values for this variable
+
+```{r}
+plot(data_news$rate_positive_words, data_news$shares, xlab = "Rate of Positive Words Among Non-neutral Tokens", ylab = "Number of Times Article was Shared")
+
+range(data_news$rate_positive_words)
+```
+
+### 48. ratenegativewords: Rate of negative words among non-neutral tokens (float)
+
+I am expecting the values of this variable to be a float between 0 and 1. There are no observations with invalid values for this variable.
+
+```{r}
+plot(data_news$rate_negative_words, data_news$shares, xlab = "Rate of Negative Words Among Non-neutral Tokens", ylab = "Number of Times Article was Shared")
+
+range(data_news$rate_negative_words)
+```
+
+### 49. avgpositivepolarity: Average polarity of positive words (float)
+
+I am expecting the values for this variable to be a float between 0 and 1. There are no observations with invalid values for this variable.
+
+```{r}
+plot(data_news$avg_positive_polarity, data_news$shares, xlab = "Average Polarity of Positive Words", ylab = "Number of Times Article was Shared")
+
+range(data_news$avg_positive_polarity)
+```
+
+
+### 50. minpositivepolarity: Minimum polarity of positive words (float)
+
+I am expecting the values for this variable to be a float between 0 and 1. There are no observations with invalid values for this variable.
+
+```{r}
+plot(data_news$min_positive_polarity, data_news$shares, xlab = "Minimum Polarity of Positive Words", ylab = "Number of Times Article was Shared")
+
+range(data_news$min_positive_polarity)
+```
+
+
+### 51. maxpositivepolarity: Maximum polarity of positive words (float)
+
+I am expecting the values for this variable to be a float between 0 and 1. There are no observations with invalid values for this variable.
+
+```{r}
+plot(data_news$max_positive_polarity, data_news$shares, xlab = "Maximum Polarity of Positive Words", ylab = "Number of Times Article was Shared")
+
+range(data_news$max_positive_polarity)
+```
+
+### 52. avgnegativepolarity: Average polarity of negative words (float)
+
+I am expecting the values for this variable to be a float between -1 and 0. There are no observations with invalid values for this variable.
+
+```{r}
+plot(data_news$avg_negative_polarity, data_news$shares, xlab = "Average Polarity of Negative Words", ylab = "Number of Times Article was Shared")
+
+range(data_news$avg_negative_polarity)
+```
+
+### 53. minnegativepolarity: Minimum polarity of negative words (float)
+
+I am expecting the values for this variable to be a float between -1 and 0. There are no observations with invalid values for this variable.
+
+```{r}
+plot(data_news$min_negative_polarity, data_news$shares, xlab = "Minimum Polarity of Negative Words", ylab = "Number of Times Article was Shared")
+
+range(data_news$min_negative_polarity)
+```
+
+
+### 54. maxnegativepolarity: Maximum polarity of negative words (float)
+
+I am expecting the values for this variable to be a float between -1 and 0. There are no observations with invalid values for this variable.
+
+```{r}
+plot(data_news$max_negative_polarity, data_news$shares, xlab = "Maximum Polarity of Negative Words", ylab = "Number of Times Article was Shared")
+
+range(data_news$max_negative_polarity)
+```
+
+
+### 55. title_subjectivity: Title subjectivity (float)
+
+I am expecting the values for this variable to be a float between 0 and 1. There are no observations with invalid values for this variable.
+
+```{r}
+plot(data_news$title_subjectivity, data_news$shares, xlab = "Title Subjectivity", ylab = "Number of Times Article was Shared")
+
+range(data_news$title_subjectivity)
+```
+
+
+### 56. titlesentimentpolarity: Title polarity (float)
+
+I am expecting the values for this variable to be a float between -1 and 1. There are no observations with invalid values for this variable.
+
+```{r}
+plot(data_news$title_sentiment_polarity, data_news$shares, xlab = "Polarity of Title", ylab = "Number of Times Article was Shared")
+
+range(data_news$title_sentiment_polarity)
+```
+
+
+### 57. abstitlesubjectivity: Absolute subjectivity level (float)
+
+I am expecting the values for this variable to be a float between 0 and 1. There are no observations with invalid values for this variable.
+
+```{r}
+plot(data_news$abs_title_subjectivity, data_news$shares, xlab = "Absolute Title Subjectivity", ylab = "Number of Times Article was Shared")
+
+range(data_news$abs_title_subjectivity)
+```
+
+
+### 58. abstitlesentiment_polarity: Absolute polarity level (float)
+
+I am expecting the values for this variable to be a float between 0 and 1. There are no observations with invalid values for this variable.
+
+```{r}
+plot(data_news$abs_title_sentiment_polarity, data_news$shares, xlab = "Absolute Polarity", ylab = "Number of Times Article was Shared")
+
+range(data_news$abs_title_sentiment_polarity)
+```
+
+

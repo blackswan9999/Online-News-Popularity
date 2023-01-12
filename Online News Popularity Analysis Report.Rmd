@@ -1,0 +1,615 @@
+---
+title: "Online News Popularity Analysis"
+author: "Alice Huang"
+date: "10/12/2022"
+output:
+  pdf_document: default
+  html_document:
+    df_print: paged
+---
+
+```{r include=FALSE}
+library(tidyverse)
+data_news <- read_csv("https://raw.githubusercontent.com/blackswan9999/Online-News-Popularity/main/OnlineNewsPopularity.csv")
+```
+
+# Part 1
+
+## Objective
+
+In the age of the Internet, many people get their news from articles shared on social media. Social media and online news websites disseminate information around the world at a speed never seen before in human history. Sharing news articles on social media helps raise awareness and change public opinion about important social, economic and political issues (Bhagat & Kim, 2022), and helps instigate discourse around how we can make our world a better place. As people spend more and more time on social media feeds curated towards their individual interests, browsing news articles shared on these feeds helps shape their worldviews. However, there have been increasing concerns that frequent use of social media and consumption of negative news content may be associated with negative mental health outcomes (Davey, 2020).
+
+Given concerns about the role of online news media in our society, it is of interest to determine how the emotions of texts, subjectivity of texts, and other measures play a role in how viral articles become. In this paper, we attempt to build a regression model that predicts the number of shares based on various features of news articles. We attempt to identify which features are the most significant in modelling the number of article shares. 
+
+## Data Collection
+
+This dataset was downloaded from Kaggle but was originally featured in Fernandes et al (2015) paper. The creators of the dataset pulled all the articles published on Mashable from January 7 2013 to January 7 2015. Mashable is a popular digital media, online news, and entertainment company. They post news articles covering entertainment, tech, world issues, and more. Fernandes et al measured various features of each article, for example, the subjectivity of the title, the rate of negative words in the text, and so on. Each row in the dataset corresponds to a news article from Mashable and its various features. The response variable is the number of times an online news article posted on Mashable was shared via Facebook, Twitter, Google+, LinkedIn, Stumble-Upon and/or Pinterest.
+
+The original dataset had 58 variables. Since we are primarily interested in polarity and subjectivity, we only consider the 16 polarity and subjectivity related explanatory variables. Polarity is a measure of how negative or positive the emotions conveyed in a text are. Polarity is measured using a score that takes on values in the interval [-1,1]. A text with polarity -1 is considered to evoke strong negative emotions. A text with polarity 0 is considered neutral. A text with polarity 1 is considered to evoke strong positive emotions.
+
+Subjectivity is a measure of how much a text reflects personal opinion/feelings/beliefs. In contrast, objectivity measures how factual a text is. Subjectivity is measured on a score that takes on values in the interval [0,1]. 0 is considered very objective and 1 is considered very subjective. Values close to 0 indicate more objective texts, and values close to 1 indicate more subjective/opinionated texts.
+
+For example, the sentence "I won the lottery" would have low subjectivity and high positive polarity. The sentence "I think pineapple on pizza is nasty" would have high subjectivity and low negative polarity.
+
+To compute the subjectivity and polarity sentiment analysis, the researchers adopted the Pattern web mining module (Smedt et al, 2014). Here positive words refer to words that evoke positive emotions in the reader, such as joy, excitement, and hope. Negative words refer to words that evoke negative emotions in the reader, such as sadness, fear, and anxiety. We use "words" and "tokens" interchangeably.
+
+Here are the potential explanatory variables we consider in this paper:
+
+* `global_subjectivity`: Text subjectivity (float)
+* `global_sentiment_polarity`: Text sentiment polarity (float)
+* `global_rate_positive_words`: Rate of positive words across all words in the content (float)
+* `global_rate_negative_words`: Rate of negative words across all words in the content (float)
+* `rate_positive_words`: Rate of positive words among non-neutral tokens (float)
+* `rate_negative_words`: Rate of negative words among non-neutral tokens (float)
+* `avg_positive_polarity`: Average polarity of positive words (float)
+* `min_positive_polarity`: Minimum of positive words' polarity scores (float)
+* `max_positive_polarity`: Maximum polarity of positive words (float)
+* `avg_negative_polarity`: Average polarity of negative words (float)
+* `min_negative_polarity`: Minimum polarity of negative words (float)
+* `max_negative_polarity`: Maximum polarity of negative words (float)
+* `title_subjectivity`: Title subjectivity (float)
+* `title_sentiment_polarity`: Title polarity (float)
+* `abs_title_subjectivity`: Absolute value of subjectivity level minus 0.5 (float)
+* `abs_title_sentiment_polarity`: Absolute value of polarity level (float)
+
+### Data Processing
+
+```{r include=FALSE}
+# data cleaning: setting invalid values to NA
+data_news$n_tokens_content[data_news$n_tokens_content <= 0] = NA
+data_news$average_token_length[data_news$average_token_length < 1] = NA
+data_news$kw_min_min[data_news$kw_min_min < 0] = NA 
+data_news$kw_min_min[data_news$kw_min_min != floor(data_news$kw_min_min)] = NA
+data_news$kw_max_min[data_news$kw_max_min < 0] = NA 
+data_news$kw_max_min[data_news$kw_max_min != floor(data_news$kw_max_min)] = NA
+data_news$kw_avg_min[data_news$kw_avg_min < 0] = NA
+data_news$kw_min_avg[data_news$kw_min_avg < 0] = NA 
+data_news$kw_min_avg[data_news$kw_min_avg != floor(data_news$kw_min_avg)] = NA
+data_news$kw_max_avg[(data_news$kw_max_avg < 0) |
+                       data_news$kw_max_avg != floor(data_news$kw_max_avg) ] = NA
+data_news$self_reference_min_shares[data_news$self_reference_min_shares !=
+                                      floor(data_news$self_reference_min_shares)] = NA
+
+data_news2014 <- data_news %>% filter(8 <= timedelta & timedelta <= 377)
+# data_news2013 <- data_news %>% filter(366 <= timedelta & timedelta <= 731)
+
+data_news2014pol <- data_news2014 %>% select(url,
+                                             global_subjectivity, 
+                                             global_sentiment_polarity, 
+                                             global_rate_positive_words,
+                                             global_rate_negative_words,
+                                             rate_positive_words,
+                                             rate_negative_words,
+                                             avg_positive_polarity,
+                                             min_positive_polarity,
+                                             max_positive_polarity,
+                                             avg_negative_polarity,
+                                             max_negative_polarity,
+                                             min_negative_polarity,
+                                             title_subjectivity,
+                                             title_sentiment_polarity,
+                                             abs_title_subjectivity,
+                                             abs_title_sentiment_polarity,
+                                             shares
+                                             )
+```
+
+Since the step() function in R only runs on dataset with maximum size 5000, we randomly sample 5000 news articles from articles published in 2014 instead of using the original dataset which had 39644 observations.
+
+```{r include=FALSE}
+set.seed(1)
+data2014sampled2 <- data_news2014pol %>% sample_n(5000)
+```
+
+Upon further inspection of the dataset, it appears that several hundred articles had all the in-text polarity and subjectivity related variables entered as 0. After visiting the links of those articles and reading the texts, we noticed those articles did contain positive and negative words, so labelling those articles as having a rate of 0 positive words out of the entire text did not seem appropriate. For example, one article entitled "500 Migrant Workers Feared Dead After Human Traffickers Ram Their Boat" (url: https://mashable.com/archive/500-migrant-workers-feared-dead) contained many negative words, so the global rate of negative words should not have been 0. Thus I removed the observations containing mostly 0's from consideration, as those were likely data entry errors.
+
+```{r include=FALSE}
+data2014sampled2 %>% filter(!(rate_positive_words == 0 & rate_negative_words == 0)) -> data2014sampled2
+```
+ 
+## Preliminary Description of Data
+
+The cleaned dataset has 4771 observations, each corresponding to a news article. We can see that the range for the number of times an article was shared is very large, with the minimum value being 22 and the maximum value being 310800. In contrast, the ranges for all the explanatory variables are within [-1,1]. All the variables take on positive values, except the ones involving negative polarity and polarity in general. Transformation of the variables may be needed, so that the response and explanatory variables are on more similar scales.
+
+\begin{table}[ht]
+\centering
+\begin{tabular}{c|cccccc}
+Variable & Min & 1st Quartile & Median & Mean & 3rd Quartile & Max\\
+\hline
+global\_subjectivity	& 0.08949 & 0.39723	& 0.45364 & 0.45352	& 0.50760 & 1.00000 \\
+global\_sentiment\_polarity & -0.38021 & 0.05192 & 0.11017 & 0.11020	 & 0.16743	 & 0.61389\\
+global\_rate\_positive\_words	 & 0.00000	 &0.02725	 &0.03696	 &0.03827	 &0.04753	 &0.13158\\
+global\_rate\_negative\_words	 & 0.00000	 &0.01077	 &0.01616	 &0.01749	 &0.02232	 &0.10112\\
+rate\_positive\_words	 & 0.0000	 &0.5909	 &0.6988	 &0.6837	 &0.7857	 &1.0000\\
+rate\_negative\_words	 & 0.0000	 &0.2143	 &0.3012	 &0.3163	 &0.4091	 &1.0000\\
+avg\_positive\_polarity	 & 0.0000	 &0.3096	 &0.3586	 &0.3617	 &0.4080	 &1.0000\\
+min\_positive\_polarity	 & 0.00000	 &0.05000	 &0.10000	 &0.09645	 &0.10000	 &1.00000\\
+max\_positive\_polarity	 & 0.0000	 &0.6000	 &0.8000	 &0.7734	 &1.0000	 &1.0000\\
+avg\_negative\_polarity	 & -1.0000	 &-0.3361	 &-0.2646	 &-0.2742	 &-0.2000	 & 0.0000\\
+max\_negative\_polarity	 & -1.0000	 &-0.1250	 &-0.1000	 &-0.1091	 &-0.0500	 & 0.0000\\
+min\_negative\_polarity	 & -1.0000	 &-0.8000	 &-0.5000	 &-0.5663	 &-0.4000	 & 0.0000\\
+title\_subjectivity	 & 0.0000	 &0.0000	 &0.1667	 &0.2844	 &0.5000	 &1.0000\\
+title\_sentiment\_polarity	 & -1.00000	  &0.00000	 & 0.00000	 & 0.06301	 & 0.13636	 & 1.00000\\
+abs\_title\_subjectivity	 & 0.0000	 &0.1667	 &0.5000	 &0.3411	 &0.5000	 &0.5000\\
+abs\_title\_sentiment\_polarity	 & 0.0000	 &0.0000	 &0.0000	 &0.1559	 &0.2500	 &1.0000\\
+shares	 &  22	&  968	 & 1400	 & 3221	 & 2600	 &310800
+\end{tabular}
+\end{table}
+
+### Summary Plots of Response Variable
+
+The response variable, the number of times an article was shared, seems to follow a right-skewed distribution with a very long right tail. From the summary statistic, we can see that the mean (3221) is much larger than the median (1400). This makes sense as there were a small proportion of articles that went viral and were shared tens of thousands of times, but 75% of articles were shared less than 2600 times.
+
+```{r echo=FALSE}
+shares_summary <- summary(data2014sampled2$shares)
+data2014sampled2 %>% ggplot(aes(x=shares)) + geom_histogram(bins = 660) + labs(title = "Count of Article Shares")
+```
+
+## Non-technical Summary
+
+We tried fitting various regression models (Linear, log-linear, Poisson, Quasi-Poisson, Negative Binomial) to predict the number of times an article is shared based on the previously described features measuring polarity and subjectivity. See Appendix for codes and summaries of the models. It turned out that the Negative Binomial model gave the best fit. From the summary of our best negative binomial model, it appears that the most significant features in predicting how many times articles get shared in a year were `global_subjectivity`, `global_rate_positive_words`, `global_rate_negative_words`, `min_positive_polarity`, `max_positive_polarity`, `max_negative_polarity`,  `title_subjectivity`, and `avg_positive_polarity:max_positive_polarity`. It appeared that articles with subjective titles and texts got shared significantly more often than more objective articles. Perhaps they were controversial, and more likely to elicit emotional responses from readers. As expected, articles with high polarity were shared more often. Positive articles got shared somewhat more often than neutral articles. Highly negative articles got shared significantly more often than neutral articles. Perhaps highly negative articles are more shocking and induce more fear in readers. They may depict rare tragedies of historical importance so readers may feel greater need to share with their social network.
+
+# Part 2
+
+### Correlation of Variables
+
+First we explore the correlation between different pairs of variables that may be related. This dataset had lots of variables that were related to each other, as they were measuring polarity and subjectivity in different ways. For example, the creators of the dataset measured `global_rate_positive_words`, the ratio of positive words to all words in the text (positive, negative, neutral), and also `rate_positive_words`, the ratio of positive words to just the non-neutral words in the text. We examined the correlation matrix for the explanatory variables and made scatterplots for the pairs with correlations greater than 0.5. See Appendix for more code and plots. After creating scatterplots for pairs of explanatory variables, we believe the following pairs are moderately or strongly correlated, and suggest ways to account for their correlations while building regression models:
+
+* `rate_positive_words` , `rate_negative_words` 
+    + Rate of positive words is 1 minus rate of negative words. 
+    + Pick one variable to include in the model but not both.
+* `rate_positive_words`, `global_rate_positive_words`
+    + Both involve counting the number of positive words in the text. 
+    + Pick one, but not both. 
+* `rate_negative_words`, `global_rate_negative_words`
+    + Both involve counting the number of negative words in the text. 
+    + Pick one but not both. 
+* `global_sentiment_polarity`, `global_subjectivity`
+    + Consider interactions.
+* `title_sentiment_polarity`, `title_subjectivity`
+    + Consider interactions.
+*  `abs_title_sentiment_polarity`, `title_subjectivity`
+    + Consider interactions.
+* `title_subjectivity`, `abs_title_subjectivity`
+    + `abs_title_subjectivity` is the absolute value of `title_subjectivity`'s distance from 0.5. 
+    + Pick one but not both.
+* `title_sentiment_polarity`, `abs_title_sentiment_polarity`
+    + `abs_title_sentiment_polarity` is the absolute value of the `title_sentiment_polarity`. 
+    + Pick one but not both.
+* `global_rate_positive_words`, `global_sentiment_polarity`
+    + Polarity measures how positive or negative a text is so it involves measuring positive words. 
+    + Pick one but not both.
+* `global_rate_negative_words`, `global_sentiment_polarity`
+    + Polarity measures how positive or negative a text is so it involves measuring negative words. 
+    + Pick one but not both.
+* `avg_positive_polarity`, `max_positive_polarity`
+    + Consider interactions.
+* `avg_negative_polarity`, `max_negative_polarity`
+    + Consider interactions.
+* `global_rate_negative_words`, `avg_negative_polarity`
+    + Consider interactions.
+
+There did not appear to be strong correlations in the other pairs of variables. The variables measuring text polarity and text subjectivity seemed to be weakly correlated. One may guess that very opinionated pieces may have more emotionally charged words, but the scatterplot did not seem to suggest strong evidence for such findings. Interestingly, there was strong correlation between absolute value of polarity and subjectivity in the title rather than the text. Perhaps the text had a lot of noise, due to being significantly longer than the title. 
+
+```{r echo=FALSE, fig.height=2, fig.width=7}
+par(mfrow=c(1,3))
+plot(data2014sampled2$global_sentiment_polarity, data2014sampled2$global_subjectivity, xlab = "Text Polarity", ylab="Text Subjectivity")
+lines(lowess(data2014sampled2$global_sentiment_polarity, data2014sampled2$global_subjectivity), col = "red")
+# cor(data2014sampled2$global_sentiment_polarity, data2014sampled2$global_subjectivity)
+
+plot(data2014sampled2$title_sentiment_polarity, data2014sampled2$title_subjectivity, ylab = "Title Subjectivity", xlab="Title Polarity")
+lines(lowess(data2014sampled2$title_sentiment_polarity, data2014sampled2$title_subjectivity), col = "red")
+
+plot(data2014sampled2$abs_title_sentiment_polarity, data2014sampled2$title_subjectivity, xlab = "Absolute Value of Title Polarity", ylab = "Title Subjectivity")
+lines(lowess(data2014sampled2$abs_title_sentiment_polarity, data2014sampled2$title_subjectivity), col = "red")
+```
+
+There was some moderate correlation between the average polarity of positive words and the maximum polarity of positive words. It may be necessary to consider interactions between `avg_positive_polarity` and `max_positive_polarity`. It seems like most articles have the polarity of negative words being around (-0.4, 0), so there aren't many articles that are very negative. There was some moderate correlation between the average polarity of negative words and the maximum polarity of negative words. It may be necessary to consider interactions between `avg_negative_polarity` and `max_negative_polarity`.
+
+```{r echo=FALSE, fig.height=2.5, fig.width=7}
+par(mfrow = c(1,3))
+
+plot(data2014sampled2$avg_positive_polarity, data2014sampled2$max_positive_polarity, xlab="Avg. Polarity of Positive Words", ylab="Max. Polarity of Positive Words")
+lines(lowess(data2014sampled2$avg_positive_polarity, data2014sampled2$max_positive_polarity), col="red")
+
+plot(data2014sampled2$avg_negative_polarity, data2014sampled2$max_negative_polarity, xlab="Avg. Polarity of Negative Words", ylab="Max. Polarity of Negative Words")
+lines(lowess(data2014sampled2$avg_negative_polarity, data2014sampled2$max_negative_polarity), col = "red")
+
+plot(data2014sampled2$global_rate_negative_words, data2014sampled2$avg_negative_polarity, xlab = "Global Rate Negative Words", ylab = "Avg. Rate Negative Words")
+lines(lowess(data2014sampled2$global_rate_negative_words, data2014sampled2$avg_negative_polarity), col = "red")
+```
+
+
+### Trying Poisson Regression
+
+Given the shape of the histogram for the number of article shares, we guessed that the number of times an article was shared in a year may follow a Poisson regression. We tried fitting a Poisson regression on the number of shares and running stepAIC to get the Poisson regression model with the best fit (see this model's summary below). However, it turns out a Poisson regression fit is unsuitable because the mean and the variance are drastically different, as evidenced by the Residual deviance being 25333822 on 4753 degrees of freedom. Also the rate at which people share articles throughout a year may not be constant, because people are less likely to share old articles. Here we use an identity link rather than a log link because the number of shares was collected, so the response data is not binary. A quasi-Poisson model also yielded similar high Residual deviance. See Appendix for more code and model outputs.
+
+```{r warning=FALSE, include=FALSE}
+pois_model <- glm(shares ~ .-url- rate_positive_words - rate_negative_words 
+                  - abs_title_subjectivity - abs_title_sentiment_polarity +
+                      global_subjectivity*global_sentiment_polarity +
+                      `title_sentiment_polarity`*`title_subjectivity` + 
+                      `avg_positive_polarity`*`max_positive_polarity` + 
+                      `avg_negative_polarity`*`max_negative_polarity` + 
+                      `global_rate_negative_words`*`avg_negative_polarity`, family = poisson(link = "identity"), data = data2014sampled2)
+step(pois_model, trace = 0)
+```
+
+```{r echo=FALSE}
+library(faraway)
+poisfit <- glm(formula = shares ~ (url + global_subjectivity + global_sentiment_polarity + 
+    global_rate_positive_words + global_rate_negative_words + 
+    rate_positive_words + rate_negative_words + avg_positive_polarity + 
+    min_positive_polarity + max_positive_polarity + avg_negative_polarity + 
+    max_negative_polarity + min_negative_polarity + title_subjectivity + 
+    title_sentiment_polarity + abs_title_subjectivity + abs_title_sentiment_polarity) - 
+    url - rate_positive_words - rate_negative_words - abs_title_subjectivity - 
+    abs_title_sentiment_polarity + global_subjectivity * global_sentiment_polarity + 
+    title_sentiment_polarity * title_subjectivity + avg_positive_polarity * 
+    max_positive_polarity + avg_negative_polarity * max_negative_polarity + 
+    global_rate_negative_words * avg_negative_polarity, family = poisson(link = "identity"), 
+    data = data2014sampled2)
+sumary(poisfit)
+```
+
+### Trying a Negative Binomial Regression
+
+We consider a negative binomial regression, which is similar to the Poisson regression but the variance is not required to be equal to the mean. The model assumes the dispersion parameter takes on the same value at all parameter values. We ran stepAIC to get the negative binomial regression model with the best fit. We first tried a log link, then an identity link. The residual deviance and AIC for the model with the log link were lower than the negative binomial model with the identity link, so we kept the negative binomial model with the log link.
+
+```{r include=FALSE}
+negbinfit <- MASS::glm.nb(shares ~ .-url- rate_positive_words - rate_negative_words -
+                              abs_title_subjectivity - abs_title_sentiment_polarity -
+                              global_sentiment_polarity + 
+                      `title_sentiment_polarity`*`title_subjectivity` + 
+                      `avg_positive_polarity`*`max_positive_polarity` + 
+                      `avg_negative_polarity`*`max_negative_polarity` + 
+                      `global_rate_negative_words`*`avg_negative_polarity`,
+                      data = data2014sampled2, link = log)
+step(negbinfit, trace=0)
+
+negbinfitbest <- MASS::glm.nb(formula = shares ~ global_subjectivity +                               global_rate_positive_words + 
+    global_rate_negative_words + avg_positive_polarity + min_positive_polarity + 
+    max_positive_polarity + max_negative_polarity + min_negative_polarity + 
+    title_subjectivity + title_sentiment_polarity + title_subjectivity:title_sentiment_polarity +
+    avg_positive_polarity:max_positive_polarity, data = data2014sampled2, 
+    init.theta = 1.005901769, link = log)
+summary(negbinfitbest)
+```
+
+### Removing Outliers
+
+We use Cook statistics plots and half-normal jackknife residual plots (as described in Extending the Linear Model with R, Faraway), to check if there are outliers with unusually high influence and leverage over the model's fit.
+
+```{r echo=FALSE, fig.height=3, fig.width=7}
+par(mfrow = c(1,2))
+faraway::halfnorm(cooks.distance(negbinfitbest))
+plot(cooks.distance(negbinfitbest), ylab = "Cook's Statistics")
+```
+
+It seems like some observations, including observations 2813, 3694 have very high Cook Statistics compared to the rest, and they don't seem to follow the trend on the half-normal jackknife residual plots. They seem to be outliers. If we remove them, most coefficients change significantly and the residual deviance decreases. 
+
+## Statistical Summary
+
+Here is the output of our best negative binomial regression model.
+
+```{r echo=FALSE}
+data2014sampled2 <- data2014sampled2[-c(3694, 2813),]
+
+negbinfitbest2 <- MASS::glm.nb(formula = shares ~ global_subjectivity +                            global_rate_positive_words + global_rate_negative_words + avg_positive_polarity + min_positive_polarity + max_positive_polarity + max_negative_polarity + min_negative_polarity + 
+    title_subjectivity + title_sentiment_polarity + title_subjectivity:title_sentiment_polarity +
+        avg_positive_polarity:max_positive_polarity, data = data2014sampled2, 
+    init.theta = 1.005901769, link = log)
+
+summary(negbinfitbest2)
+```
+
+The residual deviance of 5479.7 and the AIC of 86045 are still high, but they are still much better than those of the Poisson model, which had residual deviance of 25333822 on 4753 degrees of freedom, and AIC 25378267.
+
+From the summary of our best negative binomial model, it appears that the most significant features in predicting how many times articles get shared in a year were `global_subjectivity`, `global_rate_positive_words`, `global_rate_negative_words`, `min_positive_polarity`, `max_positive_polarity`, `max_negative_polarity`,  `title_subjectivity`, and `avg_positive_polarity:max_positive_polarity`.
+
+`title_subjectivity` was one of the most significant features in predicting the number of shares.
+Perhaps articles with titles featuring controversial opinions grabbed readers attention more quickly and readers were more likely to click on them and share them on social media. 
+`global_subjectivity` was another subjectivity-related feature that was significant in predicting shares. Perhaps readers find subjective articles more fun to read, especially if they include controversial opinions. In general, it appears that subjective articles get shared more often.
+
+It appeared that various features measuring positive polarity and the rate of positive words out of the entire text were somewhat significant in modelling the number of shares. Perhaps some Mashable users, especially those who are younger, like to browse Mashable for entertainment, so they prefer sharing funny, light-hearted articles. An older user browsing a more serious, established news site may display different behaviour. Overall, it seems that positive articles get shared somewhat more often than neutral articles.
+
+Interestingly, `max_negative_polarity` was highly significant, but `avg_negative_polarity` and `min_negative_polarity` were not. Note that `max_negative_polarity` is measured on a scale from -1 to 0, so having a more negative article would mean having the negative polarity decrease to -1. Thus a negative coefficient for `max_negative_polarity` would correspond with an increased number of shares on average. Perhaps articles with very negative words are more shocking and induce more fear in readers. Perhaps they may depict rare tragedies of historical importance (e.g. a pandemic), so they get shared more often. Readers may believe it's their responsibility to share frightening, shocking, tragic news with their social network.   
+
+\newpage
+
+# Appendix
+
+## References
+
+Bhagat, S. & Kim, D. J. (2022). Examining users’ news sharing behaviour on social media: role of perception of online civic engagement and dual social influences. Behaviour & Information Technology. DOI: 10.1080/0144929X.2022.2066019
+
+Davey, G. C. L. (2020, September 21). The psychological impact of Negative News. Psychology Today. Retrieved December 19, 2022, from https://www.psychologytoday.com/us/blog/why-we-worry/202009/the-psychological-impact-negative-news 
+
+De Smedt, T., Nijs, L., Daelemans, W. (2014). Creative web services with pattern. In: Proceedings of the Fifth International Conference on Computational Creativity. https://computationalcreativity.net/iccc2014/wp-content/uploads/2014/06/13.5_DeSmedt.pdf
+
+Fernandes, K., Vinagre, P., & Cortez, P. (2015). A proactive intelligent decision support system for predicting the popularity of online news. In Portuguese Conference on Artificial Intelligence (pp. 535-546). Springer, Cham. http://archive.ics.uci.edu/ml/datasets/Online%20News%20Popularity 
+
+
+## R codes
+
+## More on Correlation of Variables
+
+```{r eval=FALSE}
+# Code for correlation matrix
+data2014sampled2 %>% select(-c(url, shares)) -> exp_vars
+cor(exp_vars)
+```
+
+We can see that `rate_positive_words` seems to be strongly negatively correlated with `rate_negative_words`. This is expected because the rate of positive words and rate of negative words should sum up to 1.
+There is correlation between `rate_positive_words`, the rate of positive words among non-neutral words, and `global_rate_positive_words`, the rate of positive words across all words in the text. This is expected because both involve counting the number of positive words in the text. While building models, I will consider interactions between `rate_positive_words`, `rate_negative_words`. I would pick one of `rate_positive_words` or `global_rate_positive_words`, but not both.  
+
+```{r, fig.height=2, fig.width=7}
+par(mfrow=c(1,3))
+# main = "Rate of Negative Words vs Rate of Positive Words"
+ plot(data2014sampled2$rate_positive_words, data2014sampled2$rate_negative_words, 
+      xlab = "Rate of Positive Words", ylab = "Rate of Negative Words")
+lines(lowess(data2014sampled2$rate_positive_words, data2014sampled2$rate_negative_words), col = "red")
+
+plot(data2014sampled2$global_rate_positive_words, data2014sampled2$rate_positive_words, 
+     xlab="Global Rate of Positive Words", ylab = "Rate of Positive Words")
+lines(lowess(data2014sampled2$global_rate_positive_words, data2014sampled2$rate_positive_words), col = "red")
+
+plot(data2014sampled2$global_rate_negative_words, data2014sampled2$rate_negative_words, 
+     xlab="Global Rate Negative Words", ylab="Rate of Negative Words")
+lines(lowess(data2014sampled2$global_rate_negative_words, data2014sampled2$rate_negative_words), col = "red")
+```
+
+The variables measuring text polarity and text subjectivity seemed to be weakly correlated. One may guess that very opinionated pieces may have more emotionally charged words, but the scatterplot did not seem to suggest strong evidence for such findings. Interestingly, there was strong correlation between absolute value of polarity and subjectivity in the title rather than the text. Perhaps the text had a lot of noise, due to being significantly longer than the title. It may be necessary to consider interactions between title polarity and subjectivity while building models.
+
+```{r, fig.height=2, fig.width=7}
+par(mfrow=c(1,3))
+plot(data2014sampled2$global_sentiment_polarity, data2014sampled2$global_subjectivity, 
+     xlab = "Text Polarity", ylab="Text Subjectivity")
+lines(lowess(data2014sampled2$global_sentiment_polarity, data2014sampled2$global_subjectivity), col = "red")
+# cor(data2014sampled2$global_sentiment_polarity, data2014sampled2$global_subjectivity)
+
+plot(data2014sampled2$title_sentiment_polarity, data2014sampled2$title_subjectivity, 
+     ylab = "Title Subjectivity", xlab="Title Polarity")
+lines(lowess(data2014sampled2$title_sentiment_polarity, data2014sampled2$title_subjectivity), col = "red")
+
+plot(data2014sampled2$abs_title_sentiment_polarity, data2014sampled2$title_subjectivity, 
+     xlab = "Absolute Value of Title Polarity", ylab = "Title Subjectivity")
+lines(lowess(data2014sampled2$abs_title_sentiment_polarity, data2014sampled2$title_subjectivity), col = "red")
+```
+
+The title subjectivity and the absolute title subjectivity are highly correlated, because the absolute title subjectivity is the absolute value of the subjectivity level minus 0.5. While building regression models, we will just keep one or the other. We will compare to see which one is more significant. Similarly, the title polarity and absolute title polarity were also highly correlated, because the absolute title polarity is the absolute value of the title polarity. While building regression models, we will include one of the two, but not both.
+
+```{r, fig.height=3.5, fig.width=7}
+par(mfrow = c(1,2))
+
+plot(data2014sampled2$title_subjectivity, data2014sampled2$abs_title_subjectivity, 
+     xlab = "Title Subjectivity", ylab = "Magnitude of Title Subjectivity - 0.5")
+lines(lowess(data2014sampled2$title_subjectivity, data2014sampled2$abs_title_subjectivity), col = "red")
+
+plot(data2014sampled2$title_sentiment_polarity, data2014sampled2$abs_title_sentiment_polarity, 
+     xlab = "Title Polarity", ylab = "Absolute Value Title Polarity")
+lines(lowess(data2014sampled2$title_sentiment_polarity, data2014sampled2$abs_title_sentiment_polarity), col = "red")
+```
+
+Polarity in the title and article did not seem to be correlated.
+
+```{r}
+plot(data2014sampled2$title_sentiment_polarity, data2014sampled2$global_sentiment_polarity)
+lines(lowess(data2014sampled2$title_sentiment_polarity, data2014sampled2$global_sentiment_polarity), col = "red")
+```
+
+Polarity and the rate of positive words among all words in the text were somewhat correlated, probably because polarity is a measure of how positive or negative the emotions conveyed in a text are. Similarly, polarity and the rate of negative words among all words in the text were somewhat correlated. While choosing variables for a regression model, I'd probably opt for choosing the variables measuring positive and negative words, rather than polarity in general, which seems to have less detailed information about the emotions of the text.
+
+```{r, fig.height=3, fig.width=7}
+par(mfrow=c(1,2))
+plot(data2014sampled2$global_rate_positive_words, data2014sampled2$global_sentiment_polarity, 
+     xlab="Rate of Positive Words", ylab="Text Polarity")
+lines(lowess(data2014sampled2$global_rate_positive_words, data2014sampled2$global_sentiment_polarity), col = "red")
+#cor(data2014sampled2$global_rate_positive_words, data2014sampled2$global_sentiment_polarity)
+plot(data2014sampled2$global_rate_negative_words, data2014sampled2$global_sentiment_polarity, 
+     xlab = "Rate of Negative Words", ylab="Text Polarity")
+lines(lowess(data2014sampled2$global_rate_negative_words, data2014sampled2$global_sentiment_polarity), col = "red")
+#cor(data2014sampled2$global_rate_negative_words, data2014sampled2$global_sentiment_polarity)
+```
+
+
+The positive and negative polarities did not appear to be correlated. The rate of positive words out of all words and the rate of negative words out of all words did not seem to be correlated. It seemed that in most articles, having lots of positive words did not come at the expense of having no negative words. The dataset seemed to have a balance of articles with varying levels of positive, negative, and neutral words. That is, there didn't seem to be a large portion of articles that had mostly negative language with little positive language, or mostly positive language with little negative language.
+
+```{r}
+par(mfrow=c(2,3))
+plot(data2014sampled2$global_rate_positive_words, data2014sampled2$global_rate_negative_words, 
+     xlab="Global Rate of Positive Words", ylab="Global Rate of Negative Words")
+lines(lowess(data2014sampled2$global_rate_positive_words, data2014sampled2$global_rate_negative_words), col = "red")
+
+plot(data2014sampled2$avg_positive_polarity, data2014sampled2$avg_negative_polarity, 
+     xlab="Avg. Polarity of Postive Words", ylab="Avg. Polarity of Negative Words")
+lines(lowess(data2014sampled2$avg_positive_polarity, data2014sampled2$avg_negative_polarity), col = "red")
+
+plot(data2014sampled2$min_positive_polarity, data2014sampled2$avg_negative_polarity, 
+     xlab="Min. Polarity of Postive Words", ylab="Min. Polarity of Negative Words")
+lines(lowess(data2014sampled2$min_positive_polarity, data2014sampled2$avg_negative_polarity), col = "red")
+
+plot(data2014sampled2$max_positive_polarity, data2014sampled2$max_negative_polarity, 
+     xlab="Max. Polarity of Postive Words", ylab="Max. Polarity of Negative Words")
+lines(lowess(data2014sampled2$max_positive_polarity, data2014sampled2$max_negative_polarity), col = "red")
+
+plot(data2014sampled2$global_rate_positive_words, data2014sampled2$avg_positive_polarity, 
+     xlab="Global Rate Positive Words", ylab = "Avg. Positive Polarity")
+lines(lowess(data2014sampled2$global_rate_positive_words, data2014sampled2$avg_positive_polarity), col = "red")
+
+plot(data2014sampled2$avg_positive_polarity, data2014sampled2$max_positive_polarity, 
+     xlab="Avg. Polarity of Positive Words", ylab="Max. Polarity of Positive Words")
+lines(lowess(data2014sampled2$avg_positive_polarity, data2014sampled2$max_positive_polarity), col="red")
+```
+
+There is insignificant correlation between the rate of positive words across all words in the text, and the average polarity of those positive words. There is weak correlation between the rate of negative words across all words in the text, and the average polarity of those negative words.
+
+The minimum, average and maximum polarity of positive words did not appear to be strongly correlated with the minimum, average and maximum polarity of negative words.
+
+```{r, fig.height=2.5, fig.width=7}
+par(mfrow = c(1,3))
+
+plot(data2014sampled2$avg_negative_polarity, data2014sampled2$max_negative_polarity, 
+     xlab="Avg. Polarity of Negative Words", ylab="Max. Polarity of Negative Words")
+lines(lowess(data2014sampled2$avg_negative_polarity, data2014sampled2$max_negative_polarity), col = "red")
+
+plot(data2014sampled2$min_positive_polarity, data2014sampled2$max_negative_polarity, 
+     xlab="Min. Polarity of Negative Words", ylab="Max. Polarity of Negative Words")
+lines(lowess(data2014sampled2$min_positive_polarity, data2014sampled2$max_negative_polarity), col = "red")
+
+plot(data2014sampled2$global_rate_negative_words, data2014sampled2$avg_negative_polarity, 
+     xlab = "Global Rate Negative Words", ylab = "Avg. Rate Negative Words")
+lines(lowess(data2014sampled2$global_rate_negative_words, data2014sampled2$avg_negative_polarity), col = "red")
+```
+
+There was some moderate correlation between the average polarity of positive words and the maximum polarity of positive words. It may be necessary to consider interactions between `avg_positive_polarity` and `max_positive_polarity`. It seems like most articles have the polarity of negative words being around (-0.4, 0), so there aren't many articles that are very negative. There was some moderate correlation between the average polarity of negative words and the maximum polarity of negative words. It may be necessary to consider interactions between `avg_negative_polarity` and `max_negative_polarity`. 
+
+## Additional Models 
+
+### Code for Poisson Regression Model
+
+```{r}
+pois_model <- glm(shares ~ .-url- rate_positive_words - rate_negative_words 
+                  - abs_title_subjectivity - abs_title_sentiment_polarity +
+                      global_subjectivity*global_sentiment_polarity +
+                      `title_sentiment_polarity`*`title_subjectivity` + 
+                      `avg_positive_polarity`*`max_positive_polarity` + 
+                      `avg_negative_polarity`*`max_negative_polarity` + 
+                      `global_rate_negative_words`*`avg_negative_polarity`, family = poisson(link = "identity"), data = data2014sampled2)
+step(pois_model, trace = 0)
+```
+
+```{r}
+poisfit <- glm(formula = shares ~ (url + global_subjectivity + global_sentiment_polarity + 
+    global_rate_positive_words + global_rate_negative_words + 
+    rate_positive_words + rate_negative_words + avg_positive_polarity + 
+    min_positive_polarity + max_positive_polarity + avg_negative_polarity + 
+    max_negative_polarity + min_negative_polarity + title_subjectivity + 
+    title_sentiment_polarity + abs_title_subjectivity + abs_title_sentiment_polarity) - 
+    url - rate_positive_words - rate_negative_words - abs_title_subjectivity - 
+    abs_title_sentiment_polarity + global_subjectivity * global_sentiment_polarity + 
+    title_sentiment_polarity * title_subjectivity + avg_positive_polarity * 
+    max_positive_polarity + avg_negative_polarity * max_negative_polarity + 
+    global_rate_negative_words * avg_negative_polarity, family = poisson(link = "identity"), 
+    data = data2014sampled2)
+summary(poisfit)
+```
+
+
+### Code for Negative Binomial Regression
+
+```{r}
+negbinfit <- MASS::glm.nb(shares ~ .-url- rate_positive_words - rate_negative_words -
+                              abs_title_subjectivity - abs_title_sentiment_polarity -
+                              global_sentiment_polarity + 
+                      `title_sentiment_polarity`*`title_subjectivity` + 
+                      `avg_positive_polarity`*`max_positive_polarity` + 
+                      `avg_negative_polarity`*`max_negative_polarity` + 
+                      `global_rate_negative_words`*`avg_negative_polarity`,
+                      data = data2014sampled2, link = log)
+step(negbinfit, trace=0)
+
+negbinfitbest <- MASS::glm.nb(formula = shares ~ global_subjectivity + global_rate_positive_words + 
+        global_rate_negative_words + avg_positive_polarity + min_positive_polarity + 
+        max_positive_polarity + max_negative_polarity + min_negative_polarity + 
+        title_subjectivity + title_sentiment_polarity + title_subjectivity:title_sentiment_polarity +
+        avg_positive_polarity:max_positive_polarity, data = data2014sampled2, 
+    init.theta = 1.005901769, link = log)
+summary(negbinfitbest)
+```
+
+#### Removing Outliers Code
+
+```{r, fig.height=3, fig.width=7}
+par(mfrow = c(1,2))
+faraway::halfnorm(cooks.distance(negbinfitbest))
+plot(cooks.distance(negbinfitbest), ylab = "Cook's Statistics")
+```
+
+
+
+### Trying a Linear Model
+
+We can see that a linear model is not a good fit for the data because the $R^2$ value is close to 0, and the Shapiro-Wilk test shows strong evidence that the residuals are not normal.
+
+```{r}
+fit <- lm(shares ~ .-url- rate_positive_words - rate_negative_words - 
+              abs_title_subjectivity - abs_title_sentiment_polarity +
+                      `title_sentiment_polarity`*`title_subjectivity` + 
+                      `avg_positive_polarity`*`max_positive_polarity` + 
+                      `avg_negative_polarity`*`max_negative_polarity` + 
+                      `global_rate_negative_words`*`avg_negative_polarity`,
+          data=data2014sampled2)
+step(fit, trace = 0)
+
+fitlmbest <- lm(formula = shares ~ global_subjectivity + global_sentiment_polarity + 
+    global_rate_positive_words + global_rate_negative_words + 
+    avg_negative_polarity + title_subjectivity, data = data2014sampled2)
+summary(fitlmbest)
+shapiro.test(resid(fitlmbest))
+```
+
+### Trying a Log-linear model
+
+We also tried a linear model on the log of the shares, but that was also a poor fit, with the residuals not being normal, and the $R^2$ value also being close to 0.
+
+```{r}
+fit2 <- lm(log(shares) ~ .-url - rate_positive_words - rate_negative_words - 
+               abs_title_subjectivity - abs_title_sentiment_polarity +
+                      `title_sentiment_polarity`*`title_subjectivity` + 
+                      `avg_positive_polarity`*`max_positive_polarity` + 
+                      `avg_negative_polarity`*`max_negative_polarity` + 
+                      `global_rate_negative_words`*`avg_negative_polarity`,
+           data=data2014sampled2)
+step(fit2, trace = 0)
+```
+
+```{r}
+loglm <- lm(formula = log(shares) ~ global_subjectivity + global_rate_positive_words + 
+                global_rate_negative_words + avg_positive_polarity + max_positive_polarity +
+                avg_negative_polarity + title_subjectivity + title_sentiment_polarity + 
+                avg_positive_polarity:max_positive_polarity +
+                global_rate_negative_words:avg_negative_polarity, 
+            data = data2014sampled2)
+summary(loglm)
+shapiro.test(resid(loglm))
+```
+
+### Trying a Quasi-Poisson Regression
+
+```{r}
+quaspoisfit <- glm(shares ~.-url- rate_positive_words - rate_negative_words - 
+                       abs_title_subjectivity - abs_title_sentiment_polarity +
+                      global_subjectivity*global_sentiment_polarity +
+                      `title_sentiment_polarity`*`title_subjectivity` + 
+                      `avg_positive_polarity`*`max_positive_polarity` + 
+                      `avg_negative_polarity`*`max_negative_polarity` + 
+                      `global_rate_negative_words`*`avg_negative_polarity`, 
+                   family = quasipoisson(link = "identity"), data = data2014sampled2)
+summary(quaspoisfit)
+```
+
+### Trying a Negative Binomial Model with Identity Link
+
+We also fit a negative binomial model using the identity link, and tried using stepwise selection to come up with a smaller model, but its residual deviance and AIC were higher than the negative binomial model with the log link, so we keep the negative binomial model with the log link.
+
+```{r}
+negbinfit_id <- MASS::glm.nb(shares ~ .-url- rate_positive_words - rate_negative_words - abs_title_subjectivity - abs_title_sentiment_polarity+
+                                 `title_sentiment_polarity`*`title_subjectivity` + 
+                      `avg_positive_polarity`*`max_positive_polarity` + 
+                      `avg_negative_polarity`*`max_negative_polarity` + 
+                      `global_rate_negative_words`*`avg_negative_polarity`, 
+                      data = data2014sampled2, link = identity)
+summary(negbinfit_id)
+```
+
+```{r}
+negbinfit_id <- MASS::glm.nb(shares ~ .-url- rate_positive_words - rate_negative_words -
+                                 abs_title_subjectivity - abs_title_sentiment_polarity +
+                                 `title_sentiment_polarity`*`title_subjectivity` + 
+                      `avg_positive_polarity`*`max_positive_polarity`  
+                       - global_rate_positive_words - min_negative_polarity - avg_negative_polarity, 
+                      data = data2014sampled2, link = identity)
+summary(negbinfit_id)
+```
+
